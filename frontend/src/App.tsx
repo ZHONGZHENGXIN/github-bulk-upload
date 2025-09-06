@@ -12,12 +12,12 @@ import {
   ExecutionPage,
   ReviewPage,
   HistoryPage,
-  LoginForm,
   RegisterForm,
   WorkflowExecution,
   UserManagement,
   preloadCriticalRoutes,
 } from './routes/LazyRoutes';
+import SimpleLogin from './components/auth/SimpleLogin';
 import LazyRoute from './components/common/LazyRoute';
 import PerformanceMonitor from './components/common/PerformanceMonitor';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -49,7 +49,7 @@ function App() {
               {/* 公开路由 */}
               <Route path="/login" element={
                 <LazyRoute>
-                  <LoginForm />
+                  <SimpleLogin />
                 </LazyRoute>
               } />
               <Route path="/register" element={

@@ -99,6 +99,14 @@ const authSlice = createSlice({
       state.error = null;
       authService.clearAuthData();
     },
+    // 设置认证信息
+    setCredentials: (state, action) => {
+      const { user, token } = action.payload;
+      state.user = user;
+      state.token = token;
+      state.error = null;
+      authService.saveAuthData(user, token);
+    },
   },
   extraReducers: (builder) => {
     // 登录
@@ -160,5 +168,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, restoreAuth, clearAuth } = authSlice.actions;
+export const { clearError, restoreAuth, clearAuth, setCredentials } = authSlice.actions;
 export default authSlice.reducer;

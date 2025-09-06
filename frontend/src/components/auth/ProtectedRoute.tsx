@@ -36,7 +36,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   // 检查是否已认证
-  const isAuthenticated = authService.isAuthenticated() && user;
+  const isAuthenticated = authService.isAuthenticated();
 
   if (!isAuthenticated) {
     // 重定向到登录页面，并保存当前路径

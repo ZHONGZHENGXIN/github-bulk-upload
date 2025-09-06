@@ -18,9 +18,13 @@ const LoginForm: React.FC = () => {
   } = useForm<LoginCredentials>();
 
   const onSubmit = async (data: LoginCredentials) => {
-    const result = await dispatch(loginUser(data));
-    if (loginUser.fulfilled.match(result)) {
-      navigate('/dashboard');
+    try {
+      const result = await dispatch(loginUser(data));
+      if (loginUser.fulfilled.match(result)) {
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
     }
   };
 

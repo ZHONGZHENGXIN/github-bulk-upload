@@ -149,10 +149,10 @@
       window.addEventListener('offline', updateOnlineStatus);
       
       // Hide loading screen when app loads
-      window.addEventListener('DOMContentLoaded', () => {
+      window.addEventListener('load', () => {
         setTimeout(() => {
           document.body.classList.add('app-loaded');
-        }, 1000);
+        }, 500);
       });
       
       // Performance monitoring
