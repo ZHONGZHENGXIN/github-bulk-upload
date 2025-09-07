@@ -9,12 +9,22 @@
 ## 一、后端部署（Node.js）
 
 1) 创建服务
-- 在 Zeabur 新建服务，来源选择 GitHub 仓库根目录下的 `backend` 作为工作目录（Root Directory）。
-- 平台会自动识别 `backend/zeabur.json`：
-  - 安装：`npm install`
-  - 生成 Prisma Client：`npx prisma generate`
-  - 构建：`npm run build`
-  - 启动：`npm start`（等价于 `node dist/index.deploy.js`）
+- 选项 A（无需自定义镜像，使用 Buildpack）
+  - 在 Zeabur 新建服务，来源选择 GitHub 仓库根目录下的 `backend` 作为工作目录（Root Directory）。
+  - 平台会自动识别 `backend/zeabur.json`：
+    - 安装：`npm ci --include=dev`（确保安装 dev 依赖，解决 tsc 未找到）
+    - 构建：`npm run build`（脚本已改为 `npx tsc`，即使全局无 tsc 也可编译）
+    - 启动：`npm start`（等价于 `node dist/index.deploy.js`）
+  - 注意：Buildpack 方式无法用 apt-get 安装系统依赖，如遇 Prisma 缺少 OpenSSL，可改用下方 Dockerfile 方式。
+
+- 选项 B（推荐，使用 Dockerfile 解决 OpenSSL/tsc 等依赖问题）
+  - 在 Zeabur 创建服务时选择使用 Docker 方式，Root 指向 `backend`，自动识别 `backend/Dockerfile`
+  - 我已提供 `backend/Dockerfile`：
+    - 安装 openssl（解决 Prisma 运行时 libssl 缺失）
+    - `npm ci --include=dev` 安装 dev 依赖（包含 TypeScript）
+    - `npx prisma generate` 生成 Prisma Client
+    - `npm run build` 使用 npx tsc 编译；随后 `npm prune --omit=dev` 精简依赖
+    - 运行阶段复制 dist 与生产依赖，默认监听 `PORT=3000`
 
 2) 环境变量（在后端服务中设置）
 - PORT=3000（Zeabur 通常会自动注入，无需手动设置）
@@ -29,6 +39,7 @@
 
 可选（本仓库以 index.deploy.ts 为无数据库演示入口，可先不连库验证联通，后续再启用数据库与迁移）：
 - 如需启用真实数据库迁移，建议在部署阶段或启动前执行 `npx prisma migrate deploy`。
+  - Buildpack 方式：可在构建命令中追加；Dockerfile 方式：可在运行前单次执行或加入 CI/CD。
 
 3) 验证
 - 部署完成后访问：`https://你的后端域名.zeabur.app/health`

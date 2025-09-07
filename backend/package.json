@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "dev:deploy": "nodemon src/index.deploy.ts",
-    "build": "tsc --project tsconfig.deploy.json",
+    "build": "npx tsc --project tsconfig.deploy.json",
     "build:full": "tsc",
     "build:simple": "tsc -p tsconfig.build.json",
     "start": "node dist/index.deploy.js",
