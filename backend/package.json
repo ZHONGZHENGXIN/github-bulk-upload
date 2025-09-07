@@ -96,6 +96,9 @@
   ],
   "author": "Investment Workflow Team",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   }

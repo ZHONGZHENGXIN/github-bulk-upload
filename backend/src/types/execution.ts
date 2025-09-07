@@ -1,40 +1,50 @@
 export interface Execution {
   id: string;
-  userId: string;
   workflowId: string;
-  status: ExecutionStatus;
-  startedAt: Date;
-  completedAt?: Date;
-  reviewNotes?: string;
-  reviewedAt?: Date;
+  userId: string;
+  status: string;
+  priority: string;
+  progress: number;
+  tags?: string | null;
+  metadata?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  executionRecords?: ExecutionRecord[];
+  startedAt: Date;
+  completedAt?: Date | null;
+  error?: string | null;
+  records?: ExecutionRecord[];
 }
 
 export interface ExecutionRecord {
   id: string;
   executionId: string;
   stepId: string;
-  status: StepStatus;
-  notes?: string;
-  completedAt?: Date;
-  data?: Record<string, any>;
-  reviewNotes?: string;
+  status: string;
+  notes?: string | null;
+  actualTime?: number | null;
+  data?: string | null;
+  result?: string | null;
+  reviewNotes?: string | null;
   createdAt: Date;
   updatedAt: Date;
-  attachments?: Attachment[];
+  startedAt?: Date | null;
+  completedAt?: Date | null;
 }
 
 export interface Attachment {
   id: string;
-  executionRecordId: string;
-  fileName: string;
+  filename: string;
   originalName: string;
-  fileType: FileType;
-  fileSize: number;
-  filePath: string;
+  mimeType: string;
+  size: number;
+  path: string;
+  url?: string;
+  description?: string;
+  tags?: string;
+  metadata?: string;
   uploadedAt: Date;
+  uploadedBy: string;
+  executionId?: string;
 }
 
 export interface CreateExecutionDto {

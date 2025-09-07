@@ -1,563 +1,547 @@
 import prisma from '../config/database';
-import { Execution, ExecutionRecord } from '../types/execution';
 
-export interface ReviewAnalytics {
+export interface ReviewData {
+  title: string;
+  content: string;
+  rating: number;
+  lessons?: string;
+  improvements?: string;
+  tags?: string;
+  isPublic?: boolean;
+}
+
+export interface ReviewStats {
   totalReviews: number;
-  averageReviewLength: number;
-  reviewFrequency: Record<string, number>;
-  commonKeywords: Array<{ word: string; count: number }>;
-  improvementTrends: Array<{ period: string; improvements: number }>;
-}
-
-export interface ReviewInsight {
-  executionId: string;
-  workflowName: string;
-  completedAt: string;
-  reviewNotes: string;
-  keyInsights: string[];
-  improvementSuggestions: string[];
-  rating?: number;
-}
-
-export interface ReviewReport {
-  period: {
-    start: string;
-    end: string;
-  };
-  summary: {
-    totalExecutions: number;
-    totalReviews: number;
-    averageExecutionTime: number;
-    completionRate: number;
-  };
-  analytics: ReviewAnalytics;
-  executions: Array<{
-    id: string;
-    workflowName: string;
-    completedAt: string;
-    duration: number;
-    reviewNotes: string;
-    stepsCompleted: number;
-    totalSteps: number;
+  averageRating: number;
+  totalWords: number;
+  reviewsByMonth: Record<string, number>;
+  commonKeywords: Array<{
+    word: string;
+    frequency: number;
+  }>;
+  improvementTrends: Array<{
+    month: string;
+    averageRating: number;
+    reviewCount: number;
   }>;
 }
 
+export interface ReviewSummary {
+  executionId: string;
+  workflowName?: string;
+  executionDate: string;
+  rating: number;
+  content: string;
+  lessons?: string | null;
+  improvements?: string | null;
+  stepsCompleted: number;
+  totalSteps: number;
+}
+
 export class ReviewService {
-  // 生成自动复盘摘要
-  async generateReviewSummary(userId: string, executionId?: string): Promise<string> {
-    const whereClause: any = {
-      userId,
-      reviewNotes: {
-        not: null
+  // 创建复盘记录
+  async createReview(
+    executionId: string,
+    userId: string,
+    reviewData: ReviewData
+  ) {
+    // 验证执行记录是否存在且属于用户
+    const execution = await prisma.execution.findFirst({
+      where: {
+        id: executionId,
+        userId
       }
-    };
-
-    if (executionId) {
-      whereClause.id = executionId;
-    }
-
-    const executions = await prisma.execution.findMany({
-      where: whereClause,
-      include: {
-        workflow: true,
-        executionRecords: {
-          include: {
-            step: true
-          }
-        }
-      },
-      orderBy: {
-        completedAt: 'desc'
-      },
-      take: executionId ? 1 : 10
     });
 
-    if (executions.length === 0) {
-      return '暂无复盘数据可供分析。';
+    if (!execution) {
+      throw new Error('执行记录不存在或无权限访问');
     }
 
-    const totalExecutions = executions.length;
-    const avgExecutionTime = this.calculateAverageExecutionTime(executions);
-    const commonPatterns = this.identifyCommonPatterns(executions);
-    const improvementAreas = this.identifyImprovementAreas(executions);
-    
-    let summary = `## 复盘摘要\n\n`;
-    
-    if (executionId) {
-      const execution = executions[0];
-      summary += `### 执行概况\n`;
-      summary += `- **流程名称**: ${execution.workflow?.name}\n`;
-      summary += `- **执行时长**: ${this.formatDuration(execution.startedAt, execution.completedAt || '')}\n`;
-      summary += `- **完成步骤**: ${execution.executionRecords?.filter(r => r.status === 'COMPLETED').length}/${execution.executionRecords?.length}\n\n`;
-    } else {
-      summary += `### 整体概况\n`;
-      summary += `- **分析期间**: 最近${totalExecutions}次执行\n`;
-      summary += `- **平均执行时长**: ${this.formatDurationMs(avgExecutionTime)}\n`;
-      summary += `- **总复盘字数**: ${executions.reduce((sum, e) => sum + (e.reviewNotes?.length || 0), 0)}\n\n`;
+    // 检查是否已有复盘记录
+    const existingReview = await prisma.review.findFirst({
+      where: { executionId }
+    });
+
+    if (existingReview) {
+      throw new Error('该执行记录已有复盘记录');
     }
 
-    if (commonPatterns.length > 0) {
-      summary += `### 常见模式\n`;
-      commonPatterns.forEach((pattern, index) => {
-        summary += `${index + 1}. ${pattern}\n`;
-      });
-      summary += `\n`;
-    }
+    const review = await prisma.review.create({
+      data: {
+        executionId,
+        createdBy: userId,
+        title: reviewData.title,
+        content: reviewData.content,
+        rating: reviewData.rating,
+        lessons: reviewData.lessons,
+        improvements: reviewData.improvements,
+        tags: reviewData.tags,
+        isPublic: reviewData.isPublic || false
+      }
+    });
 
-    if (improvementAreas.length > 0) {
-      summary += `### 改进建议\n`;
-      improvementAreas.forEach((area, index) => {
-        summary += `${index + 1}. ${area}\n`;
-      });
-      summary += `\n`;
-    }
-
-    return summary;
+    return review;
   }
 
-  // 识别趋势和模式
-  async identifyTrends(userId: string): Promise<{
-    executionTrends: Array<{ period: string; count: number; avgDuration: number }>;
-    performanceTrends: Array<{ period: string; completionRate: number; efficiency: number }>;
-    reviewQualityTrends: Array<{ period: string; avgLength: number; insightCount: number }>;
-  }> {
-    const executions = await prisma.execution.findMany({
+  // 更新复盘记录
+  async updateReview(
+    reviewId: string,
+    userId: string,
+    reviewData: Partial<ReviewData>
+  ) {
+    const review = await prisma.review.findFirst({
       where: {
-        userId,
-        completedAt: {
-          not: null
-        }
-      },
-      include: {
-        workflow: true,
-        executionRecords: true
-      },
-      orderBy: {
-        completedAt: 'asc'
+        id: reviewId,
+        createdBy: userId
       }
     });
 
-    // 按月分组数据
-    const monthlyData: Record<string, any[]> = {};
-    executions.forEach(execution => {
-      if (execution.completedAt) {
-        const month = new Date(execution.completedAt).toISOString().slice(0, 7);
-        if (!monthlyData[month]) {
-          monthlyData[month] = [];
-        }
-        monthlyData[month].push(execution);
+    if (!review) {
+      throw new Error('复盘记录不存在或无权限访问');
+    }
+
+    const updatedReview = await prisma.review.update({
+      where: { id: reviewId },
+      data: {
+        title: reviewData.title,
+        content: reviewData.content,
+        rating: reviewData.rating,
+        lessons: reviewData.lessons,
+        improvements: reviewData.improvements,
+        tags: reviewData.tags,
+        isPublic: reviewData.isPublic
       }
     });
 
-    const executionTrends = Object.entries(monthlyData).map(([month, execs]) => ({
-      period: month,
-      count: execs.length,
-      avgDuration: this.calculateAverageExecutionTime(execs)
-    }));
+    return updatedReview;
+  }
 
-    const performanceTrends = Object.entries(monthlyData).map(([month, execs]) => {
-      const totalSteps = execs.reduce((sum, e) => sum + (e.executionRecords?.length || 0), 0);
-      const completedSteps = execs.reduce((sum, e) => 
-        sum + (e.executionRecords?.filter(r => r.status === 'COMPLETED').length || 0), 0);
-      
-      return {
-        period: month,
-        completionRate: totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0,
-        efficiency: execs.length > 0 ? this.calculateAverageExecutionTime(execs) : 0
-      };
+  // 删除复盘记录
+  async deleteReview(reviewId: string, userId: string) {
+    const review = await prisma.review.findFirst({
+      where: {
+        id: reviewId,
+        createdBy: userId
+      }
     });
 
-    const reviewQualityTrends = Object.entries(monthlyData).map(([month, execs]) => {
-      const reviewedExecs = execs.filter(e => e.reviewNotes);
-      const avgLength = reviewedExecs.length > 0 
-        ? reviewedExecs.reduce((sum, e) => sum + (e.reviewNotes?.length || 0), 0) / reviewedExecs.length
-        : 0;
-      
-      const insightCount = reviewedExecs.reduce((sum, e) => {
-        const insights = this.extractKeyInsights(e.reviewNotes || '');
-        return sum + insights.length;
-      }, 0);
+    if (!review) {
+      throw new Error('复盘记录不存在或无权限访问');
+    }
 
-      return {
-        period: month,
-        avgLength: Math.round(avgLength),
-        insightCount
-      };
+    await prisma.review.delete({
+      where: { id: reviewId }
     });
+  }
+
+  // 获取用户的复盘记录列表
+  async getUserReviews(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    filters?: {
+      rating?: number;
+      dateRange?: {
+        start: Date;
+        end: Date;
+      };
+      searchTerm?: string;
+    }
+  ) {
+    const skip = (page - 1) * limit;
+    
+    const where: any = {
+      createdBy: userId
+    };
+
+    if (filters?.rating) {
+      where.rating = filters.rating;
+    }
+
+    if (filters?.dateRange) {
+      where.createdAt = {
+        gte: filters.dateRange.start,
+        lte: filters.dateRange.end
+      };
+    }
+
+    if (filters?.searchTerm) {
+      where.OR = [
+        { title: { contains: filters.searchTerm, mode: 'insensitive' } },
+        { content: { contains: filters.searchTerm, mode: 'insensitive' } },
+        { lessons: { contains: filters.searchTerm, mode: 'insensitive' } },
+        { improvements: { contains: filters.searchTerm, mode: 'insensitive' } }
+      ];
+    }
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where,
+        include: {
+          execution: {
+            include: {
+              workflow: {
+                select: {
+                  name: true
+                }
+              },
+              records: {
+                select: {
+                  status: true
+                }
+              }
+            }
+          }
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.review.count({ where })
+    ]);
 
     return {
-      executionTrends,
-      performanceTrends,
-      reviewQualityTrends
+      reviews: reviews.map(review => ({
+        id: review.id,
+        executionId: review.executionId,
+        workflowName: review.execution.workflow?.name,
+        title: review.title,
+        content: review.content,
+        rating: review.rating,
+        lessons: review.lessons,
+        improvements: review.improvements,
+        tags: review.tags,
+        isPublic: review.isPublic,
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+        stepsCompleted: review.execution.records?.filter(r => r.status === 'COMPLETED').length || 0,
+        totalSteps: review.execution.records?.length || 0
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+        hasPrev: page > 1
+      }
     };
   }
 
-  // 获取用户的复盘分析
-  async getUserReviewAnalytics(userId: string): Promise<ReviewAnalytics> {
-    // 获取所有有复盘内容的执行记录
-    const executionsWithReviews = await prisma.execution.findMany({
-      where: {
-        userId,
-        reviewNotes: {
-          not: null
-        }
-      },
+  // 获取复盘统计信息
+  async getReviewStats(userId: string): Promise<ReviewStats> {
+    const reviews = await prisma.review.findMany({
+      where: { createdBy: userId },
       include: {
-        workflow: true,
-        executionRecords: {
-          where: {
-            reviewNotes: {
-              not: null
+        execution: {
+          include: {
+            records: {
+              select: {
+                status: true
+              }
             }
           }
         }
       }
     });
 
-    const totalReviews = executionsWithReviews.length;
-    const totalReviewLength = executionsWithReviews.reduce(
-      (sum, exec) => sum + (exec.reviewNotes?.length || 0), 0
-    );
-    const averageReviewLength = totalReviews > 0 ? Math.round(totalReviewLength / totalReviews) : 0;
+    const totalReviews = reviews.length;
+    const averageRating = totalReviews > 0 
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews 
+      : 0;
 
-    // 按月统计复盘频率
-    const reviewFrequency: Record<string, number> = {};
-    executionsWithReviews.forEach(exec => {
-      if (exec.reviewedAt) {
-        const month = new Date(exec.reviewedAt).toISOString().slice(0, 7); // YYYY-MM
-        reviewFrequency[month] = (reviewFrequency[month] || 0) + 1;
-      }
+    const totalWords = reviews.reduce((sum, review) => {
+      const wordCount = (review.content?.length || 0) + 
+                       (review.lessons?.length || 0) + 
+                       (review.improvements?.length || 0);
+      return sum + wordCount;
+    }, 0);
+
+    // 按月统计复盘数量
+    const reviewsByMonth: Record<string, number> = {};
+    reviews.forEach(review => {
+      const month = new Date(review.createdAt).toISOString().slice(0, 7); // YYYY-MM
+      reviewsByMonth[month] = (reviewsByMonth[month] || 0) + 1;
     });
 
-    // 提取常见关键词（简化版本）
-    const allReviewText = executionsWithReviews
-      .map(exec => exec.reviewNotes || '')
-      .join(' ');
-    const words = allReviewText
-      .toLowerCase()
-      .replace(/[^\u4e00-\u9fa5a-zA-Z\s]/g, '') // 保留中文和英文
-      .split(/\s+/)
-      .filter(word => word.length > 1);
+    // 提取常用关键词（简单实现）
+    const allText = reviews
+      .map(review => `${review.content || ''} ${review.lessons || ''} ${review.improvements || ''}`)
+      .join(' ')
+      .toLowerCase();
     
-    const wordCount: Record<string, number> = {};
+    const words = allText.match(/\b\w{3,}\b/g) || [];
+    const wordFreq: Record<string, number> = {};
     words.forEach(word => {
-      wordCount[word] = (wordCount[word] || 0) + 1;
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
     });
-    
-    const commonKeywords = Object.entries(wordCount)
+
+    const commonKeywords = Object.entries(wordFreq)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 10)
-      .map(([word, count]) => ({ word, count }));
+      .map(([word, frequency]) => ({ word, frequency }));
 
-    // 改进趋势分析（按季度）
-    const improvementTrends: Array<{ period: string; improvements: number }> = [];
-    const quarterlyData: Record<string, number> = {};
-    
-    executionsWithReviews.forEach(exec => {
-      if (exec.reviewedAt) {
-        const date = new Date(exec.reviewedAt);
-        const year = date.getFullYear();
-        const quarter = Math.floor(date.getMonth() / 3) + 1;
-        const period = `${year}Q${quarter}`;
-        
-        // 简单的改进计数（包含"改进"、"提升"、"优化"等词的复盘）
-        const improvementWords = ['改进', '提升', '优化', '改善', '完善'];
-        const hasImprovement = improvementWords.some(word => 
-          exec.reviewNotes?.includes(word)
-        );
-        
-        if (hasImprovement) {
-          quarterlyData[period] = (quarterlyData[period] || 0) + 1;
-        }
-      }
-    });
-    
-    Object.entries(quarterlyData)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([period, improvements]) => {
-        improvementTrends.push({ period, improvements });
+    // 改进趋势
+    const improvementTrends: Array<{
+      month: string;
+      averageRating: number;
+      reviewCount: number;
+    }> = [];
+
+    Object.entries(reviewsByMonth).forEach(([month, count]) => {
+      const monthReviews = reviews.filter(review => 
+        new Date(review.createdAt).toISOString().slice(0, 7) === month
+      );
+      const avgRating = monthReviews.reduce((sum, review) => sum + review.rating, 0) / count;
+      
+      improvementTrends.push({
+        month,
+        averageRating: avgRating,
+        reviewCount: count
       });
+    });
+
+    improvementTrends.sort((a, b) => a.month.localeCompare(b.month));
 
     return {
       totalReviews,
-      averageReviewLength,
-      reviewFrequency,
+      averageRating,
+      totalWords,
+      reviewsByMonth,
       commonKeywords,
       improvementTrends
     };
   }
 
-  // 获取复盘洞察
-  async getReviewInsights(userId: string, limit: number = 10): Promise<ReviewInsight[]> {
-    const executions = await prisma.execution.findMany({
-      where: {
-        userId,
-        status: 'COMPLETED',
-        reviewNotes: {
-          not: null
-        }
-      },
-      include: {
-        workflow: true
-      },
-      orderBy: {
-        completedAt: 'desc'
-      },
-      take: limit
-    });
+  // 搜索复盘记录
+  async searchReviews(
+    userId: string,
+    searchTerm: string,
+    options?: {
+      includePublic?: boolean;
+      minRating?: number;
+      maxRating?: number;
+    }
+  ) {
+    const where: any = {
+      OR: [
+        { title: { contains: searchTerm, mode: 'insensitive' } },
+        { content: { contains: searchTerm, mode: 'insensitive' } },
+        { lessons: { contains: searchTerm, mode: 'insensitive' } },
+        { improvements: { contains: searchTerm, mode: 'insensitive' } }
+      ]
+    };
 
-    return executions.map(exec => {
-      const reviewNotes = exec.reviewNotes || '';
-      
-      // 提取关键洞察（简化版本）
-      const keyInsights = this.extractKeyInsights(reviewNotes);
-      const improvementSuggestions = this.extractImprovementSuggestions(reviewNotes);
-      
-      return {
-        executionId: exec.id,
-        workflowName: exec.workflow?.name || '',
-        completedAt: exec.completedAt?.toISOString() || '',
-        reviewNotes,
-        keyInsights,
-        improvementSuggestions
-      };
-    });
-  }
-
-  // 获取复盘模板建议
-  async getReviewTemplate(workflowType?: string): Promise<string[]> {
-    // 基础复盘模板
-    const baseTemplate = [
-      '本次投资决策的主要目标是什么？',
-      '执行过程中遇到了哪些挑战？',
-      '哪些步骤执行得比较顺利？原因是什么？',
-      '哪些步骤遇到了困难？如何改进？',
-      '本次决策的关键信息来源有哪些？',
-      '如果重新执行，会有什么不同的做法？',
-      '从这次执行中学到了什么？',
-      '对未来类似决策有什么建议？'
-    ];
-
-    // 根据工作流类型定制模板
-    if (workflowType) {
-      // 这里可以根据不同的投资类型添加特定问题
-      const specificQuestions = this.getWorkflowSpecificQuestions(workflowType);
-      return [...baseTemplate, ...specificQuestions];
+    if (!options?.includePublic) {
+      where.createdBy = userId;
+    } else {
+      where.OR.push({ createdBy: userId }, { isPublic: true });
     }
 
-    return baseTemplate;
-  }
+    if (options?.minRating !== undefined) {
+      where.rating = { gte: options.minRating };
+    }
 
-  // 生成复盘报告
-  async generateReviewReport(userId: string, period: { start: Date; end: Date }) {
-    const executions = await prisma.execution.findMany({
-      where: {
-        userId,
-        completedAt: {
-          gte: period.start,
-          lte: period.end
-        },
-        reviewNotes: {
-          not: null
-        }
-      },
+    if (options?.maxRating !== undefined) {
+      where.rating = { ...where.rating, lte: options.maxRating };
+    }
+
+    const reviews = await prisma.review.findMany({
+      where,
       include: {
-        workflow: true,
-        executionRecords: {
+        execution: {
           include: {
-            step: true
+            workflow: {
+              select: {
+                name: true
+              }
+            },
+            records: {
+              select: {
+                status: true
+              }
+            }
           }
         }
       },
-      orderBy: {
-        completedAt: 'desc'
-      }
+      orderBy: { createdAt: 'desc' }
     });
 
-    const analytics = await this.getUserReviewAnalytics(userId);
-    
-    return {
-      period: {
-        start: period.start.toISOString(),
-        end: period.end.toISOString()
-      },
-      summary: {
-        totalExecutions: executions.length,
-        totalReviews: executions.filter(e => e.reviewNotes).length,
-        averageExecutionTime: this.calculateAverageExecutionTime(executions),
-        completionRate: executions.length > 0 ? 100 : 0 // 这里只统计已完成的
-      },
-      analytics,
-      executions: executions.map(exec => ({
-        id: exec.id,
-        workflowName: exec.workflow?.name,
-        completedAt: exec.completedAt,
-        duration: exec.completedAt && exec.startedAt 
-          ? new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime()
-          : 0,
-        reviewNotes: exec.reviewNotes,
-        stepsCompleted: exec.executionRecords?.filter(r => r.status === 'COMPLETED').length || 0,
-        totalSteps: exec.executionRecords?.length || 0
-      }))
-    };
+    return reviews.map(review => ({
+      id: review.id,
+      executionId: review.executionId,
+      workflowName: review.execution.workflow?.name,
+      title: review.title,
+      content: review.content,
+      rating: review.rating,
+      lessons: review.lessons,
+      improvements: review.improvements,
+      tags: review.tags,
+      isPublic: review.isPublic,
+      createdAt: review.createdAt,
+      stepsCompleted: review.execution.records?.filter(r => r.status === 'COMPLETED').length || 0,
+      totalSteps: review.execution.records?.length || 0
+    }));
   }
 
-  // 私有方法：识别常见模式
-  private identifyCommonPatterns(executions: any[]): string[] {
-    const patterns: string[] = [];
-    
-    // 分析执行时间模式
-    const durations = executions.map(e => 
-      e.completedAt && e.startedAt 
-        ? new Date(e.completedAt).getTime() - new Date(e.startedAt).getTime()
+  // 生成复盘报告
+  async generateReviewReport(
+    userId: string,
+    options?: {
+      dateRange?: {
+        start: Date;
+        end: Date;
+      };
+      workflowIds?: string[];
+      format?: 'summary' | 'detailed';
+    }
+  ) {
+    const where: any = {
+      createdBy: userId
+    };
+
+    if (options?.dateRange) {
+      where.createdAt = {
+        gte: options.dateRange.start,
+        lte: options.dateRange.end
+      };
+    }
+
+    if (options?.workflowIds && options.workflowIds.length > 0) {
+      where.execution = {
+        workflowId: {
+          in: options.workflowIds
+        }
+      };
+    }
+
+    const reviews = await prisma.review.findMany({
+      where,
+      include: {
+        execution: {
+          include: {
+            workflow: {
+              select: {
+                name: true,
+                category: true
+              }
+            },
+            records: {
+              select: {
+                status: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const stats = {
+      totalReviews: reviews.length,
+      averageRating: reviews.length > 0 
+        ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length 
+        : 0,
+      totalExecutions: reviews.length,
+      completionRate: reviews.length > 0 
+        ? reviews.reduce((sum, r) => {
+            const completed = r.execution.records?.filter(rec => rec.status === 'COMPLETED').length || 0;
+            const total = r.execution.records?.length || 0;
+            return sum + (total > 0 ? completed / total : 0);
+          }, 0) / reviews.length * 100
         : 0
-    ).filter(d => d > 0);
-    
-    if (durations.length > 0) {
-      const avgDuration = durations.reduce((sum, d) => sum + d, 0) / durations.length;
-      const shortExecutions = durations.filter(d => d < avgDuration * 0.7).length;
-      const longExecutions = durations.filter(d => d > avgDuration * 1.3).length;
-      
-      if (shortExecutions > executions.length * 0.3) {
-        patterns.push('大部分执行时间较短，可能存在流程简化的机会');
-      }
-      if (longExecutions > executions.length * 0.3) {
-        patterns.push('部分执行时间较长，建议分析耗时步骤并优化');
-      }
-    }
-
-    // 分析复盘内容模式
-    const reviewTexts = executions.map(e => e.reviewNotes || '').filter(text => text.length > 0);
-    if (reviewTexts.length > 0) {
-      const avgLength = reviewTexts.reduce((sum, text) => sum + text.length, 0) / reviewTexts.length;
-      const shortReviews = reviewTexts.filter(text => text.length < avgLength * 0.5).length;
-      
-      if (shortReviews > reviewTexts.length * 0.5) {
-        patterns.push('复盘内容普遍较简短，建议增加更详细的思考和总结');
-      }
-    }
-
-    return patterns;
-  }
-
-  // 私有方法：识别改进领域
-  private identifyImprovementAreas(executions: any[]): string[] {
-    const areas: string[] = [];
-    
-    // 分析步骤完成率
-    const stepStats = executions.map(e => {
-      const total = e.executionRecords?.length || 0;
-      const completed = e.executionRecords?.filter(r => r.status === 'COMPLETED').length || 0;
-      return total > 0 ? completed / total : 1;
-    });
-    
-    if (stepStats.length > 0) {
-      const avgCompletionRate = stepStats.reduce((sum, rate) => sum + rate, 0) / stepStats.length;
-      if (avgCompletionRate < 0.8) {
-        areas.push('步骤完成率偏低，建议优化流程设计或提高执行效率');
-      }
-    }
-
-    // 分析复盘质量
-    const reviewTexts = executions.map(e => e.reviewNotes || '').filter(text => text.length > 0);
-    if (reviewTexts.length > 0) {
-      const hasInsights = reviewTexts.filter(text => 
-        ['学到', '发现', '意识到', '理解'].some(keyword => text.includes(keyword))
-      ).length;
-      
-      if (hasInsights < reviewTexts.length * 0.5) {
-        areas.push('复盘深度不足，建议增加更多反思和洞察');
-      }
-    }
-
-    return areas;
-  }
-
-  // 私有方法：提取关键洞察
-  private extractKeyInsights(reviewText: string): string[] {
-    const insights: string[] = [];
-    
-    // 查找包含洞察关键词的句子
-    const insightKeywords = ['发现', '意识到', '学到', '理解', '认识到'];
-    const sentences = reviewText.split(/[。！？\n]/).filter(s => s.trim());
-    
-    sentences.forEach(sentence => {
-      if (insightKeywords.some(keyword => sentence.includes(keyword))) {
-        insights.push(sentence.trim());
-      }
-    });
-    
-    return insights.slice(0, 3); // 最多返回3个洞察
-  }
-
-  // 私有方法：提取改进建议
-  private extractImprovementSuggestions(reviewText: string): string[] {
-    const suggestions: string[] = [];
-    
-    // 查找包含改进关键词的句子
-    const improvementKeywords = ['应该', '需要', '建议', '改进', '优化', '提升'];
-    const sentences = reviewText.split(/[。！？\n]/).filter(s => s.trim());
-    
-    sentences.forEach(sentence => {
-      if (improvementKeywords.some(keyword => sentence.includes(keyword))) {
-        suggestions.push(sentence.trim());
-      }
-    });
-    
-    return suggestions.slice(0, 3); // 最多返回3个建议
-  }
-
-  // 私有方法：获取工作流特定问题
-  private getWorkflowSpecificQuestions(workflowType: string): string[] {
-    const specificQuestions: Record<string, string[]> = {
-      'stock': [
-        '股票选择的逻辑是否合理？',
-        '买入时机的判断是否准确？',
-        '风险控制措施是否有效？'
-      ],
-      'fund': [
-        '基金配置是否符合预期？',
-        '定投策略执行情况如何？',
-        '资产配置比例是否合适？'
-      ]
     };
-    
-    return specificQuestions[workflowType] || [];
+
+    const summaries: ReviewSummary[] = reviews.map(review => ({
+      executionId: review.executionId,
+      workflowName: review.execution.workflow?.name,
+      executionDate: review.execution.startedAt.toISOString(),
+      rating: review.rating,
+      content: review.content,
+      lessons: review.lessons,
+      improvements: review.improvements,
+      stepsCompleted: review.execution.records?.filter(r => r.status === 'COMPLETED').length || 0,
+      totalSteps: review.execution.records?.length || 0
+    }));
+
+    return {
+      stats,
+      summaries: options?.format === 'summary' ? summaries.slice(0, 5) : summaries,
+      generatedAt: new Date().toISOString()
+    };
   }
 
-  // 私有方法：计算平均执行时间
-  private calculateAverageExecutionTime(executions: any[]): number {
-    if (executions.length === 0) return 0;
-    
-    const totalTime = executions.reduce((sum, exec) => {
-      if (exec.completedAt && exec.startedAt) {
-        return sum + (new Date(exec.completedAt).getTime() - new Date(exec.startedAt).getTime());
+  // 获取复盘详情
+  async getReviewDetail(reviewId: string, userId: string) {
+    const review = await prisma.review.findFirst({
+      where: {
+        id: reviewId,
+        OR: [
+          { createdBy: userId },
+          { isPublic: true }
+        ]
+      },
+      include: {
+        execution: {
+          include: {
+            workflow: {
+              select: {
+                name: true,
+                description: true,
+                category: true
+              }
+            },
+            records: {
+              include: {
+                step: {
+                  select: {
+                    title: true,
+                    description: true,
+                    type: true
+                  }
+                }
+              }
+            }
+          }
+        }
       }
-      return sum;
-    }, 0);
-    
-    return Math.round(totalTime / executions.length);
-  }
+    });
 
-  // 私有方法：格式化持续时间（毫秒）
-  private formatDurationMs(milliseconds: number): string {
-    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
-    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
-    
-    if (hours > 0) {
-      return `${hours}小时${minutes}分钟`;
+    if (!review) {
+      throw new Error('复盘记录不存在或无权限访问');
     }
-    return `${minutes}分钟`;
-  }
 
-  // 私有方法：格式化持续时间（字符串）
-  private formatDuration(startTime: string, endTime: string): string {
-    if (!endTime) return '进行中';
-    
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    const duration = end.getTime() - start.getTime();
-    
-    return this.formatDurationMs(duration);
+    return {
+      id: review.id,
+      executionId: review.executionId,
+      title: review.title,
+      content: review.content,
+      rating: review.rating,
+      lessons: review.lessons,
+      improvements: review.improvements,
+      tags: review.tags,
+      isPublic: review.isPublic,
+      createdAt: review.createdAt,
+      updatedAt: review.updatedAt,
+      execution: {
+        id: review.execution.id,
+        workflowName: review.execution.workflow?.name,
+        workflowDescription: review.execution.workflow?.description,
+        workflowCategory: review.execution.workflow?.category,
+        status: review.execution.status,
+        startedAt: review.execution.startedAt,
+        completedAt: review.execution.completedAt,
+        steps: review.execution.records?.map(record => ({
+          id: record.id,
+          stepName: record.step?.title,
+          stepDescription: record.step?.description,
+          stepType: record.step?.type,
+          status: record.status,
+          notes: record.notes,
+          reviewNotes: record.reviewNotes,
+          completedAt: record.completedAt
+        })) || []
+      }
+    };
   }
 }

@@ -56,7 +56,7 @@ investment-workflow-manager/
 
 **环境变量**:
 ```env
-VITE_API_URL=https://investment-workflow-manager.zeabur.app/api
+VITE_API_URL=https://<你的后端域名>.zeabur.app/api
 VITE_APP_NAME=投资流程管理系统
 ```
 

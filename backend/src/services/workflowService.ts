@@ -6,17 +6,20 @@ export class WorkflowService {
   async createWorkflow(userId: string, workflowData: CreateWorkflowDto): Promise<Workflow> {
     const workflow = await prisma.workflow.create({
       data: {
-        userId,
+        createdBy: userId,
         name: workflowData.name,
         description: workflowData.description,
         steps: {
           create: workflowData.steps.map(step => ({
-            name: step.name,
+            title: step.title,
             description: step.description,
+            type: step.type || 'CHECKLIST',
             order: step.order,
             isRequired: step.isRequired,
-            stepType: step.stepType,
-            metadata: step.metadata || {}
+            estimatedTime: step.estimatedTime,
+            dependencies: step.dependencies,
+            conditions: step.conditions,
+            metadata: step.metadata
           }))
         }
       },
@@ -33,7 +36,7 @@ export class WorkflowService {
   // 获取用户的所有工作流
   async getUserWorkflows(userId: string): Promise<Workflow[]> {
     const workflows = await prisma.workflow.findMany({
-      where: { userId },
+      where: { createdBy: userId },
       include: {
         steps: {
           orderBy: { order: 'asc' }
@@ -50,7 +53,7 @@ export class WorkflowService {
     const workflow = await prisma.workflow.findFirst({
       where: {
         id: workflowId,
-        userId
+        createdBy: userId
       },
       include: {
         steps: {
@@ -97,12 +100,15 @@ export class WorkflowService {
         await tx.workflowStep.createMany({
           data: updateData.steps.map(step => ({
             workflowId,
-            name: step.name!,
+            title: step.title!,
             description: step.description,
+            type: step.type || 'CHECKLIST',
             order: step.order!,
             isRequired: step.isRequired!,
-            stepType: step.stepType!,
-            metadata: step.metadata || {}
+            estimatedTime: step.estimatedTime,
+            dependencies: step.dependencies,
+            conditions: step.conditions,
+            metadata: step.metadata
           }))
         });
       }
@@ -162,17 +168,20 @@ export class WorkflowService {
 
     const duplicatedWorkflow = await prisma.workflow.create({
       data: {
-        userId,
+        createdBy: userId,
         name: newName || `${originalWorkflow.name} (副本)`,
         description: originalWorkflow.description,
         steps: {
           create: originalWorkflow.steps?.map(step => ({
-            name: step.name,
+            title: step.title,
             description: step.description,
+            type: step.type,
             order: step.order,
             isRequired: step.isRequired,
-            stepType: step.stepType,
-            metadata: step.metadata || {}
+            estimatedTime: step.estimatedTime,
+            dependencies: step.dependencies,
+            conditions: step.conditions,
+            metadata: step.metadata
           })) || []
         }
       },

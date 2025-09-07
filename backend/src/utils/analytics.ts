@@ -294,7 +294,12 @@ class AnalyticsSystem {
   }
 
   // 查找时间模式
-  private findTimePatterns(actions: UserAction[]) {
+  private findTimePatterns(actions: UserAction[]): Array<{
+    pattern: string;
+    frequency: number;
+    lastSeen: Date;
+    confidence: number;
+  }> {
     const hourCounts = new Map<number, number>();
     const dayOfWeekCounts = new Map<number, number>();
 
@@ -339,7 +344,12 @@ class AnalyticsSystem {
   }
 
   // 查找页面访问模式
-  private findPagePatterns(actions: UserAction[]) {
+  private findPagePatterns(actions: UserAction[]): Array<{
+    pattern: string;
+    frequency: number;
+    lastSeen: Date;
+    confidence: number;
+  }> {
     const pageCounts = new Map<string, number>();
     const pageTransitions = new Map<string, number>();
 

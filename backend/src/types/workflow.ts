@@ -1,23 +1,31 @@
 export interface Workflow {
   id: string;
-  userId: string;
   name: string;
-  description?: string;
+  description?: string | null;
+  version: string;
+  category?: string | null;
+  tags?: string | null;
   isActive: boolean;
+  status: string;
+  metadata?: string | null;
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string;
   steps?: WorkflowStep[];
 }
 
 export interface WorkflowStep {
   id: string;
   workflowId: string;
-  name: string;
-  description?: string;
+  title: string;
+  description?: string | null;
+  type: string;
   order: number;
   isRequired: boolean;
-  stepType: StepType;
-  metadata?: Record<string, any>;
+  estimatedTime?: number | null;
+  dependencies?: string | null;
+  conditions?: string | null;
+  metadata?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,29 +37,40 @@ export interface CreateWorkflowDto {
 }
 
 export interface CreateWorkflowStepDto {
-  name: string;
+  title: string;
   description?: string;
+  type?: string;
   order: number;
   isRequired: boolean;
-  stepType: StepType;
-  metadata?: Record<string, any>;
+  estimatedTime?: number;
+  dependencies?: string;
+  conditions?: string;
+  metadata?: string;
 }
 
 export interface UpdateWorkflowDto {
   name?: string;
   description?: string;
+  version?: string;
+  category?: string;
+  tags?: string;
   isActive?: boolean;
+  status?: string;
+  metadata?: string;
   steps?: UpdateWorkflowStepDto[];
 }
 
 export interface UpdateWorkflowStepDto {
   id?: string;
-  name?: string;
+  title?: string;
   description?: string;
+  type?: string;
   order?: number;
   isRequired?: boolean;
-  stepType?: StepType;
-  metadata?: Record<string, any>;
+  estimatedTime?: number;
+  dependencies?: string;
+  conditions?: string;
+  metadata?: string;
 }
 
 export enum StepType {

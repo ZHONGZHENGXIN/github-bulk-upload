@@ -43,6 +43,9 @@
     "vite-bundle-analyzer": "^0.7.0",
     "vitest": "^0.34.6"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

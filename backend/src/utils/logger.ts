@@ -140,14 +140,14 @@ try {
 } catch (error) {
   console.warn('Failed to initialize winston logger, falling back to simple logger:', error);
   useSimpleLogger = true;
-  logger = simpleLogger as any;
+  // logger = simpleLogger as any;
 }
 
 // 创建安全的日志记录函数
 const safeLog = (level: string, message: string, meta?: any) => {
   try {
     if (useSimpleLogger) {
-      (simpleLogger as any)[level](message, meta);
+      console.log(`[${level.toUpperCase()}] ${message}`, meta);
     } else {
       (logger as any)[level](message, meta);
     }
@@ -172,7 +172,7 @@ export const businessLogger = {
   userAction: (userId: string, action: string, details: any = {}) => {
     try {
       if (useSimpleLogger) {
-        simpleBusinessLogger.userAction(userId, action, details);
+        console.log(`[USER_ACTION] ${userId}: ${action}`, details);
       } else {
         logger.info('User action', {
           category: 'user_action',
