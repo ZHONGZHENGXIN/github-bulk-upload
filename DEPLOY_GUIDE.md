@@ -45,14 +45,25 @@
   - 输出目录：`dist`
   - 框架：`vite`
 
-2) 环境变量（在前端服务中设置）
-- VITE_API_URL=https://你的后端域名.zeabur.app/api
-- VITE_APP_ENV=production
-- VITE_DEBUG=false
-- VITE_APP_TITLE=投资流程管理系统
-- VITE_APP_VERSION=1.0.0
+2) 连接后端的两种方式（选其一）
 
-说明：前端代码在生产环境下会优先读取 `VITE_API_URL`，未设置时将回退到相对路径 `/api`。通常推荐显式设置 `VITE_API_URL` 指向后端域名，避免跨域或反代未配置导致的 404。
+- 方式 A（推荐，免配置环境变量）：在前端服务添加路由反代，将 `/api` 转发到后端
+  - 打开前端服务 → Networking/Routes（路由）→ Add Route
+  - Path（路径）: `/api/(.*)`
+  - Destination（目标）: `https://<你的后端域名>.zeabur.app/api/$1`
+  - Method: All（全部）
+  - 保存并重新部署前端
+  - 注意：使用该方式时，不需要在前端设置 `VITE_API_URL`，代码默认请求相对路径 `/api`
+
+- 方式 B（使用环境变量直连后端）：
+  - 在前端服务设置以下环境变量：
+    - VITE_API_URL=https://你的后端域名.zeabur.app/api
+    - VITE_APP_ENV=production
+    - VITE_DEBUG=false
+    - VITE_APP_TITLE=投资流程管理系统
+    - VITE_APP_VERSION=1.0.0
+
+说明：前端代码在生产环境下会优先读取 `VITE_API_URL`，如果未设置则回退到相对路径 `/api`。
 
 3) 验证
 - 部署完成后访问前端域名，打开浏览器开发者工具 → Network，确认接口请求指向 `VITE_API_URL` 后端域名并获得 200。
@@ -73,4 +84,3 @@
 - 前端页面能正常登录、导航并完成 API 调用
 
 至此，前后端即可在 Zeabur 上稳定运行并互通。如需自定义域名，按 Zeabur 控制台指引为两个服务分别绑定域名并更新相关环境变量。
-

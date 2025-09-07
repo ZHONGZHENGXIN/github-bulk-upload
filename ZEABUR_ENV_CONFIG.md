@@ -37,7 +37,13 @@ JWT_EXPIRES_IN=7d
 # 环境
 NODE_ENV=production
 
-# CORS配置 (允许前端域名访问)
+# CORS配置（允许前端域名访问，支持多域名和通配符）
+# 多个域名用逗号分隔，例如：
+# CORS_ORIGIN=https://app1.zeabur.app,https://app2.zeabur.app
+# 支持通配符匹配子域，例如：
+# CORS_ORIGIN=https://*.yourdomain.com
+# 支持端口通配，例如本地开发：
+# CORS_ORIGIN=http://localhost:*
 CORS_ORIGIN=https://your-frontend-service.zeabur.app
 
 # 文件上传配置

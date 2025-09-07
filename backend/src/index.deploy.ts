@@ -16,19 +16,33 @@ app.use(helmet());
 app.use(compression());
 
 const rawCorsOrigin = process.env.CORS_ORIGIN || '*';
-const allowedOrigins = rawCorsOrigin
+const originPatterns = rawCorsOrigin
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
+const allowAllOrigins = originPatterns.includes('*');
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) return true; // 无 Origin 的请求（健康检查、同源等）
+  if (allowAllOrigins) return true;
+  return originPatterns.some(p => {
+    if (p === origin) return true; // 精确匹配
+    if (p.includes('*')) {
+      // 通配符匹配，例如 https://*.zeabur.app 或 http://localhost:*
+      const regex = new RegExp('^' + p.split('*').map(escapeRegExp).join('.*') + '$');
+      return regex.test(origin);
+    }
+    return false;
+  });
+};
 
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes('*')) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin || undefined)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'), false);
   },
-  credentials: allowedOrigins.includes('*') ? false : true
+  credentials: allowAllOrigins ? false : true
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
