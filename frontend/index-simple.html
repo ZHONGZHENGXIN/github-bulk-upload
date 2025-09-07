@@ -17,22 +17,21 @@
         min-height: 100vh;
       }
       
-      /* 简单的初始加载样式 */
-      .initial-loading {
+      /* 简单的加载指示器 */
+      .loading {
         display: flex;
         justify-content: center;
         align-items: center;
         height: 100vh;
-        background: #f8fafc;
+        font-size: 18px;
         color: #666;
-        font-size: 16px;
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <div class="initial-loading">正在加载应用...</div>
+      <div class="loading">正在加载应用...</div>
     </div>
-    <script type="module" src="/src/main-debug.tsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
