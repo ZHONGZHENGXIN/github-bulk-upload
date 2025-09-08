@@ -1,21 +1,21 @@
-import React, { useState } from 'react';
-import { 
-  WifiIcon, 
-  NoSymbolIcon as WifiSlashIcon, 
-  CloudArrowUpIcon, 
+import React, { useState } from 'react'
+import {
+  WifiIcon,
+  NoSymbolIcon as WifiSlashIcon,
+  CloudArrowUpIcon,
   TrashIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   XMarkIcon,
-  ArrowPathIcon
-} from '@heroicons/react/24/outline';
-import { useOfflineContext } from '../../contexts/OfflineContext';
-import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
+  ArrowPathIcon,
+} from '@heroicons/react/24/outline'
+import { useOfflineContext } from '../../contexts/OfflineContext'
+import { formatDistanceToNow } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
 
 interface OfflinePanelProps {
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen: boolean
+  onClose: () => void
 }
 
 const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
@@ -29,31 +29,31 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
     manualSync,
     clearCache,
     getOfflineCapabilities,
-  } = useOfflineContext();
+  } = useOfflineContext()
 
-  const [isClearing, setIsClearing] = useState(false);
-  const capabilities = getOfflineCapabilities();
+  const [isClearing, setIsClearing] = useState(false)
+  const capabilities = getOfflineCapabilities()
 
   const handleManualSync = async () => {
     try {
-      await manualSync();
+      await manualSync()
     } catch (error) {
-      console.error('Manual sync failed:', error);
+      console.error('Manual sync failed:', error)
     }
-  };
+  }
 
   const handleClearCache = async () => {
-    setIsClearing(true);
+    setIsClearing(true)
     try {
-      await clearCache();
+      await clearCache()
     } catch (error) {
-      console.error('Clear cache failed:', error);
+      console.error('Clear cache failed:', error)
     } finally {
-      setIsClearing(false);
+      setIsClearing(false)
     }
-  };
+  }
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -70,15 +70,10 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-gray-900">离线状态管理</h2>
-              <p className={`text-sm ${isOnline ? 'text-green-600' : 'text-red-600'}`}>
-                {isOnline ? '在线' : '离线'}
-              </p>
+              <p className={`text-sm ${isOnline ? 'text-green-600' : 'text-red-600'}`}>{isOnline ? '在线' : '离线'}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <XMarkIcon className="h-5 w-5 text-gray-500" />
           </button>
         </div>
@@ -90,7 +85,7 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
             <div className="bg-blue-50 p-4 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-blue-600 font-medium">待同步数据</p>
+                  <p className="text-sm text-blue-600 font-medium">待同步数量</p>
                   <p className="text-2xl font-bold text-blue-900">{pendingCount}</p>
                 </div>
                 <CloudArrowUpIcon className="h-8 w-8 text-blue-500" />
@@ -147,10 +142,7 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
               <div className="flex items-center space-x-2">
                 <CheckCircleIcon className="h-5 w-5 text-green-500" />
                 <span className="text-sm text-gray-600">
-                  最后同步: {formatDistanceToNow(new Date(lastSyncTime), { 
-                    addSuffix: true, 
-                    locale: zhCN 
-                  })}
+                  最后同步 {formatDistanceToNow(new Date(lastSyncTime), { addSuffix: true, locale: zhCN })}
                 </span>
               </div>
             </div>
@@ -162,9 +154,9 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {Object.entries({
                 'Service Worker': capabilities.serviceWorkerSupported,
-                'IndexedDB': capabilities.indexedDBSupported,
-                '后台同步': capabilities.backgroundSyncSupported,
-                '缓存API': capabilities.cacheAPISupported,
+                IndexedDB: capabilities.indexedDBSupported,
+                后台同步: capabilities.backgroundSyncSupported,
+                缓存API: capabilities.cacheAPISupported,
               }).map(([feature, supported]) => (
                 <div key={feature} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <span className="text-sm font-medium text-gray-700">{feature}</span>
@@ -174,39 +166,12 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
                     ) : (
                       <XMarkIcon className="h-4 w-4" />
                     )}
-                    <span className="text-xs font-medium">
-                      {supported ? '支持' : '不支持'}
-                    </span>
+                    <span className="text-xs font-medium">{supported ? '支持' : '不支持'}</span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* 同步错误列表 */}
-          {syncErrors.length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-3">同步错误</h3>
-              <div className="space-y-2">
-                {syncErrors.map((error) => (
-                  <div key={error.id} className="bg-red-50 border border-red-200 p-3 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                      <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-sm text-red-800 font-medium">{error.message}</p>
-                        <p className="text-xs text-red-600 mt-1">
-                          {formatDistanceToNow(new Date(error.timestamp), { 
-                            addSuffix: true, 
-                            locale: zhCN 
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* 离线使用提示 */}
           {!isOnline && (
@@ -230,7 +195,8 @@ const OfflinePanel: React.FC<OfflinePanelProps> = ({ isOpen, onClose }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default OfflinePanel;
+export default OfflinePanel
+

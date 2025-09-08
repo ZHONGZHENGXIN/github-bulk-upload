@@ -1,0 +1,4 @@
+🚀 Investment Workflow API Server running on port 3006
+📊 Health check: http://localhost:3006/health
+🔍 API status: http://localhost:3006/api/status
+🌍 Environment: development

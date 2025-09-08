@@ -1,86 +1,84 @@
-import express from 'express';
-import cors from 'cors';
-import compression from 'compression';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
+import express from 'express'
+import cors from 'cors'
+import compression from 'compression'
+import helmet from 'helmet'
+import dotenv from 'dotenv'
 
 // 加载环境变量
-dotenv.config();
+dotenv.config()
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const app = express()
+const PORT = process.env.PORT || 3000
 
 // 基础中间件
-app.set('trust proxy', 1);
-app.use(helmet());
-app.use(compression());
+app.set('trust proxy', 1)
+app.use(helmet())
+app.use(compression())
 
-const rawCorsOrigin = process.env.CORS_ORIGIN || '*';
-const originPatterns = rawCorsOrigin
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-const allowAllOrigins = originPatterns.includes('*');
+const rawCorsOrigin = process.env.CORS_ORIGIN || '*'
+const originPatterns = rawCorsOrigin.split(',').map(o => o.trim()).filter(Boolean)
+const allowAllOrigins = originPatterns.includes('*')
 
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const isOriginAllowed = (origin?: string): boolean => {
-  if (!origin) return true; // 无 Origin 的请求（健康检查、同源等）
-  if (allowAllOrigins) return true;
+  // 无 Origin 的请求（健康检查、同源等）直接放行
+  if (!origin) return true
+  if (allowAllOrigins) return true
   return originPatterns.some(p => {
-    if (p === origin) return true; // 精确匹配
+    if (p === origin) return true // 精确匹配
     if (p.includes('*')) {
       // 通配符匹配，例如 https://*.zeabur.app 或 http://localhost:*
-      const regex = new RegExp('^' + p.split('*').map(escapeRegExp).join('.*') + '$');
-      return regex.test(origin);
+      const regex = new RegExp('^' + p.split('*').map(escapeRegExp).join('.*') + '$')
+      return regex.test(origin)
     }
-    return false;
-  });
-};
+    return false
+  })
+}
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (isOriginAllowed(origin || undefined)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'), false);
+    if (isOriginAllowed(origin || undefined)) return callback(null, true)
+    return callback(new Error('Not allowed by CORS'), false)
   },
-  credentials: allowAllOrigins ? false : true
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  credentials: allowAllOrigins ? false : true,
+}))
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // 健康检查端点
 app.get('/health', (req, res) => {
-  res.json({ 
+  res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development',
-    version: '1.0.0'
-  });
-});
-
-// API根路径
-app.get('/api', (req, res) => {
-  res.json({ 
-    message: '投资流程管理API服务器运行中',
     version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
+  })
+})
 
-// 基础API路由
+// API 根路由
+app.get('/api', (req, res) => {
+  res.json({
+    message: '投资流程管理 API 服务器运行中',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+  })
+})
+
+// 基础 API 路由
 app.get('/api/status', (req, res) => {
   res.json({
     status: 'running',
     message: 'Investment Workflow Manager API',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
+    uptime: process.uptime(),
+  })
+})
 
-// 模拟认证API
+// 模拟认证 API
 app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body;
-  
+  const { email, password } = req.body
+
   // 简单的模拟认证
   if (email && password) {
     res.json({
@@ -90,25 +88,25 @@ app.post('/api/auth/login', (req, res) => {
           id: '1',
           email: email,
           name: '测试用户',
-          role: 'user'
+          role: 'user',
         },
         token: 'mock-jwt-token-' + Date.now(),
-        refreshToken: 'mock-refresh-token-' + Date.now()
-      }
-    });
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+      },
+    })
   } else {
     res.status(400).json({
       success: false,
       error: {
-        message: '邮箱和密码不能为空'
-      }
-    });
+        message: '邮箱和密码不能为空',
+      },
+    })
   }
-});
+})
 
 app.post('/api/auth/register', (req, res) => {
-  const { email, password, name } = req.body;
-  
+  const { email, password, name } = req.body
+
   if (email && password && name) {
     res.json({
       success: true,
@@ -117,21 +115,21 @@ app.post('/api/auth/register', (req, res) => {
           id: '1',
           email: email,
           name: name,
-          role: 'user'
+          role: 'user',
         },
         token: 'mock-jwt-token-' + Date.now(),
-        refreshToken: 'mock-refresh-token-' + Date.now()
-      }
-    });
+        refreshToken: 'mock-refresh-token-' + Date.now(),
+      },
+    })
   } else {
     res.status(400).json({
       success: false,
       error: {
-        message: '所有字段都是必需的'
-      }
-    });
+        message: '所有字段都是必需的',
+      },
+    })
   }
-});
+})
 
 app.get('/api/auth/me', (req, res) => {
   res.json({
@@ -140,12 +138,12 @@ app.get('/api/auth/me', (req, res) => {
       id: '1',
       email: 'user@example.com',
       name: '测试用户',
-      role: 'user'
-    }
-  });
-});
+      role: 'user',
+    },
+  })
+})
 
-// 模拟用户管理API
+// 模拟用户管理 API
 app.get('/api/users', (req, res) => {
   res.json({
     success: true,
@@ -156,7 +154,7 @@ app.get('/api/users', (req, res) => {
         name: '管理员',
         role: 'admin',
         createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-        lastLogin: new Date(Date.now() - 3600000).toISOString()
+        lastLogin: new Date(Date.now() - 3600000).toISOString(),
       },
       {
         id: '2',
@@ -164,7 +162,7 @@ app.get('/api/users', (req, res) => {
         name: '普通用户',
         role: 'user',
         createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
-        lastLogin: new Date(Date.now() - 7200000).toISOString()
+        lastLogin: new Date(Date.now() - 7200000).toISOString(),
       },
       {
         id: '3',
@@ -172,24 +170,24 @@ app.get('/api/users', (req, res) => {
         name: '分析师',
         role: 'analyst',
         createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
-        lastLogin: new Date(Date.now() - 1800000).toISOString()
-      }
-    ]
-  });
-});
+        lastLogin: new Date(Date.now() - 1800000).toISOString(),
+      },
+    ],
+  })
+})
 
 app.post('/api/users', (req, res) => {
-  const { email, name, role } = req.body;
-  
+  const { email, name, role } = req.body
+
   if (!email || !name || !role) {
     return res.status(400).json({
       success: false,
       error: {
-        message: '邮箱、姓名和角色都是必需的'
-      }
-    });
+        message: '邮箱、姓名和角色都是必需的',
+      },
+    })
   }
-  
+
   res.json({
     success: true,
     data: {
@@ -198,15 +196,15 @@ app.post('/api/users', (req, res) => {
       name,
       role,
       createdAt: new Date().toISOString(),
-      lastLogin: null
-    }
-  });
-});
+      lastLogin: null,
+    },
+  })
+})
 
 app.put('/api/users/:id', (req, res) => {
-  const { id } = req.params;
-  const { email, name, role } = req.body;
-  
+  const { id } = req.params
+  const { email, name, role } = req.body
+
   res.json({
     success: true,
     data: {
@@ -216,21 +214,21 @@ app.put('/api/users/:id', (req, res) => {
       role,
       createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
       updatedAt: new Date().toISOString(),
-      lastLogin: new Date(Date.now() - 3600000).toISOString()
-    }
-  });
-});
+      lastLogin: new Date(Date.now() - 3600000).toISOString(),
+    },
+  })
+})
 
 app.delete('/api/users/:id', (req, res) => {
-  const { id } = req.params;
-  
+  const { id } = req.params
+
   res.json({
     success: true,
-    message: `用户 ${id} 已删除`
-  });
-});
+    message: `用户 ${id} 已删除`,
+  })
+})
 
-// 模拟业务管理API
+// 模拟业务管理 API
 app.get('/api/businesses', (req, res) => {
   res.json({
     success: true,
@@ -244,46 +242,35 @@ app.get('/api/businesses', (req, res) => {
         status: 'active',
         description: '中国领先的互联网增值服务提供商',
         createdAt: new Date(Date.now() - 86400000 * 60).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000 * 5).toISOString()
+        updatedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
       },
       {
         id: '2',
         name: '阿里巴巴',
         symbol: 'BABA',
         sector: '电商',
-        marketCap: 2100000000000,
+        marketCap: 2000000000000,
         status: 'active',
-        description: '全球领先的电子商务平台',
+        description: '领先的电子商务与云计算公司',
         createdAt: new Date(Date.now() - 86400000 * 45).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000 * 3).toISOString()
+        updatedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
       },
-      {
-        id: '3',
-        name: '美团',
-        symbol: '03690.HK',
-        sector: '生活服务',
-        marketCap: 800000000000,
-        status: 'active',
-        description: '中国领先的生活服务电子商务平台',
-        createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000 * 1).toISOString()
-      }
-    ]
-  });
-});
+    ],
+  })
+})
 
 app.post('/api/businesses', (req, res) => {
-  const { name, symbol, sector, marketCap, description } = req.body;
-  
+  const { name, symbol, sector, marketCap, description } = req.body
+
   if (!name || !symbol || !sector) {
     return res.status(400).json({
       success: false,
       error: {
-        message: '公司名称、股票代码和行业都是必需的'
-      }
-    });
+        message: '公司名称、股票代码、行业为必填项',
+      },
+    })
   }
-  
+
   res.json({
     success: true,
     data: {
@@ -295,15 +282,15 @@ app.post('/api/businesses', (req, res) => {
       status: 'active',
       description: description || '',
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  });
-});
+      updatedAt: new Date().toISOString(),
+    },
+  })
+})
 
 app.put('/api/businesses/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, symbol, sector, marketCap, description, status } = req.body;
-  
+  const { id } = req.params
+  const { name, symbol, sector, marketCap, description, status } = req.body
+
   res.json({
     success: true,
     data: {
@@ -315,21 +302,21 @@ app.put('/api/businesses/:id', (req, res) => {
       status,
       description,
       createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  });
-});
+      updatedAt: new Date().toISOString(),
+    },
+  })
+})
 
 app.delete('/api/businesses/:id', (req, res) => {
-  const { id } = req.params;
-  
+  const { id } = req.params
+
   res.json({
     success: true,
-    message: `业务 ${id} 已删除`
-  });
-});
+    message: `业务 ${id} 已删除`,
+  })
+})
 
-// 模拟工作流API
+// 模拟工作流 API
 app.get('/api/workflows', (req, res) => {
   res.json({
     success: true,
@@ -342,10 +329,10 @@ app.get('/api/workflows', (req, res) => {
           { id: '1', name: '市场分析', description: '分析市场趋势' },
           { id: '2', name: '公司研究', description: '深入研究目标公司' },
           { id: '3', name: '风险评估', description: '评估投资风险' },
-          { id: '4', name: '投资决策', description: '做出最终投资决策' }
+          { id: '4', name: '投资决策', description: '做出最终投资决策' },
         ],
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
       },
       {
         id: '2',
@@ -353,19 +340,19 @@ app.get('/api/workflows', (req, res) => {
         description: '债券投资决策流程',
         steps: [
           { id: '1', name: '信用评级分析', description: '分析债券信用评级' },
-          { id: '2', name: '收益率分析', description: '计算预期收益率' },
-          { id: '3', name: '投资决策', description: '做出投资决策' }
+          { id: '2', name: '收益率分析', description: '计算预期收益' },
+          { id: '3', name: '投资决策', description: '做出投资决策' },
         ],
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }
-    ]
-  });
-});
+        updatedAt: new Date().toISOString(),
+      },
+    ],
+  })
+})
 
 app.post('/api/workflows', (req, res) => {
-  const { name, description, steps } = req.body;
-  
+  const { name, description, steps } = req.body
+
   res.json({
     success: true,
     data: {
@@ -374,12 +361,12 @@ app.post('/api/workflows', (req, res) => {
       description,
       steps: steps || [],
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }
-  });
-});
+      updatedAt: new Date().toISOString(),
+    },
+  })
+})
 
-// 模拟执行API
+// 模拟执行 API
 app.get('/api/executions', (req, res) => {
   res.json({
     success: true,
@@ -397,24 +384,24 @@ app.get('/api/executions', (req, res) => {
             stepId: '1',
             stepName: '市场分析',
             status: 'COMPLETED',
-            completedAt: new Date(Date.now() - 1800000).toISOString()
+            completedAt: new Date(Date.now() - 1800000).toISOString(),
           },
           {
             id: '2',
             stepId: '2',
             stepName: '公司研究',
             status: 'IN_PROGRESS',
-            startedAt: new Date(Date.now() - 900000).toISOString()
-          }
-        ]
-      }
-    ]
-  });
-});
+            startedAt: new Date(Date.now() - 900000).toISOString(),
+          },
+        ],
+      },
+    ],
+  })
+})
 
 app.post('/api/executions', (req, res) => {
-  const { workflowId } = req.body;
-  
+  const { workflowId } = req.body
+
   res.json({
     success: true,
     data: {
@@ -423,12 +410,12 @@ app.post('/api/executions', (req, res) => {
       status: 'PENDING',
       progress: 0,
       createdAt: new Date().toISOString(),
-      records: []
-    }
-  });
-});
+      records: [],
+    },
+  })
+})
 
-// 模拟历史记录API
+// 模拟历史记录 API
 app.get('/api/history', (req, res) => {
   res.json({
     success: true,
@@ -439,27 +426,27 @@ app.get('/api/history', (req, res) => {
           workflowName: '股票投资流程',
           status: 'COMPLETED',
           duration: 7200000,
-          completedAt: new Date(Date.now() - 86400000).toISOString()
+          completedAt: new Date(Date.now() - 86400000).toISOString(),
         },
         {
           id: '2',
           workflowName: '债券投资流程',
           status: 'COMPLETED',
           duration: 3600000,
-          completedAt: new Date(Date.now() - 172800000).toISOString()
-        }
+          completedAt: new Date(Date.now() - 172800000).toISOString(),
+        },
       ],
       stats: {
         total: 2,
         completed: 2,
         failed: 0,
-        avgDuration: 5400000
-      }
-    }
-  });
-});
+        avgDuration: 5400000,
+      },
+    },
+  })
+})
 
-// 模拟复盘API
+// 模拟复盘 API
 app.get('/api/reviews', (req, res) => {
   res.json({
     success: true,
@@ -470,15 +457,15 @@ app.get('/api/reviews', (req, res) => {
         title: '股票投资复盘',
         content: '本次投资决策过程顺利，市场分析准确，公司研究深入。',
         insights: ['市场时机把握良好', '风险控制到位'],
-        createdAt: new Date(Date.now() - 86400000).toISOString()
-      }
-    ]
-  });
-});
+        createdAt: new Date(Date.now() - 86400000).toISOString(),
+      },
+    ],
+  })
+})
 
 app.post('/api/reviews', (req, res) => {
-  const { executionId, title, content } = req.body;
-  
+  const { executionId, title, content } = req.body
+
   res.json({
     success: true,
     data: {
@@ -487,55 +474,56 @@ app.post('/api/reviews', (req, res) => {
       title,
       content,
       insights: [],
-      createdAt: new Date().toISOString()
-    }
-  });
-});
+      createdAt: new Date().toISOString(),
+    },
+  })
+})
 
-// 404处理
+// 404 处理
 app.use('*', (req, res) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.originalUrl} not found`,
-    timestamp: new Date().toISOString()
-  });
-});
+    timestamp: new Date().toISOString(),
+  })
+})
 
 // 错误处理
 app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', error);
+  console.error('Error:', error)
   res.status(500).json({
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong',
-    timestamp: new Date().toISOString()
-  });
-});
+    timestamp: new Date().toISOString(),
+  })
+})
 
-// 优雅关闭处理
+// 优雅关闭
 const gracefulShutdown = (signal: string) => {
-  console.log(`Received ${signal}, shutting down gracefully`);
-  process.exit(0);
-};
+  console.log(`Received ${signal}, shutting down gracefully`)
+  process.exit(0)
+}
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
-// 启动服务器
+// 启动服务
 const server = app.listen(PORT, () => {
-  console.log(`🚀 Investment Workflow API Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔍 API status: http://localhost:${PORT}/api/status`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+  console.log(`🚀 Investment Workflow API Server running on port ${PORT}`)
+  console.log(`📊 Health check: http://localhost:${PORT}/health`)
+  console.log(`🔍 API status: http://localhost:${PORT}/api/status`)
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
+})
 
 // 处理服务器错误
 server.on('error', (error: any) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use`);
+    console.error(`⚠️ Port ${PORT} is already in use`)
   } else {
-    console.error('❌ Server error:', error);
+    console.error('⚠️ Server error:', error)
   }
-  process.exit(1);
-});
+  process.exit(1)
+})
 
-export default app;
+export default app
+
